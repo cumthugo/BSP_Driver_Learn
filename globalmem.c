@@ -182,3 +182,9 @@ void globalmem_exit(void)
 	unregister_chrdev_region(MKDEV(globalmem_major,0), 1);
 }
 
+module_init(globalmem_init);
+module_exit(globalmem_exit);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Hugo@yfve");
+MODULE_DESCRIPTION("A char device driver as an example");
+
