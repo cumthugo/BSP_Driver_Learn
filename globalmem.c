@@ -19,7 +19,7 @@
 #define GLOBALMEM_SIZE 0x1000 /*size 4k*/
 
 #define MEM_CLEAR 0x01
-#define GLOBALMEM_MAJOR 250
+#define GLOBALMEM_MAJOR 150
 
 static int globalmem_major = GLOBALMEM_MAJOR;
 
@@ -156,6 +156,7 @@ void globalmem_setup_cdev(void)
 
 int globalmem_init(void)
 {
+	printk("[Zhang Yong] globalmem_init start\n");
 	int result;
 	dev_t devno = MKDEV(globalmem_major,0);
 	
