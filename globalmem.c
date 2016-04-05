@@ -212,7 +212,8 @@ int globalmem_init(void)
 	memset(globalmem_devp,0,sizeof(struct globalmem_dev));
 
 	globalmem_setup_cdev(globalmem_devp,0);
-	init_MUTEX(&globalmem_devp->sem);
+	//init_MUTEX(&globalmem_devp->sem);
+	sema_init(&globalmem_devp->sem,1);
 	return 0;
 fail_malloc:
 	unregister_chrdev_region(devno,1);
