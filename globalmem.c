@@ -28,6 +28,7 @@ struct globalmem_dev
 {
 	struct cdev cdev;
 	unsigned char mem[GLOBALMEM_SIZE];
+	struct semaphore sem;
 };
 
 
@@ -111,6 +112,9 @@ static ssize_t globalmem_write(struct file* filp, const char __user * buf, size_
 		return 0;
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
+	
+	if (down_interruptible(&dev->sem))
+		return - ERESTARTSYS;
 
 	if (copy_from_user(dev->mem + p, buf, count))
 		ret = -EFAULT;
@@ -120,6 +124,7 @@ static ssize_t globalmem_write(struct file* filp, const char __user * buf, size_
 		ret = count;
 		printk(KERN_INFO"written %d byte(s) from %d\n",count, p);
 	}
+	up(&dev->sem);
 	return ret;
 }
 
@@ -136,6 +141,9 @@ static ssize_t globalmem_read(struct file* filp, char __user *buf, size_t count,
 		return 0;
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
+	
+	if (down_interruptible(&dev->sem))
+		return - ERESTARTSYS;
 
 	if (copy_to_user(buf,(void*)(dev->mem + p),count))
 		ret = -EFAULT;
@@ -145,6 +153,7 @@ static ssize_t globalmem_read(struct file* filp, char __user *buf, size_t count,
 		ret = count;
 		printk(KERN_INFO"read %d byte(s) from %d\n",count, p);
 	}
+	up(&dev->sem);
 	return ret;
 }
 
@@ -201,9 +210,9 @@ int globalmem_init(void)
 	}
 
 	memset(globalmem_devp,0,sizeof(struct globalmem_dev));
-	
 
 	globalmem_setup_cdev(globalmem_devp,0);
+	init_MUTEX(&globalmem_devp->sem);
 	return 0;
 fail_malloc:
 	unregister_chrdev_region(devno,1);
