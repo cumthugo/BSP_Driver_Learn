@@ -32,10 +32,17 @@ struct globalfifo_dev
 	struct semaphore sem;
 	wait_queue_head_t r_wait;
 	wait_queue_head_t w_wait;
+	struct fasync_struct* async_queue;
 };
 
-
 struct globalfifo_dev* globalfifo_devp;
+
+
+static int globalfifo_fasync(int fd, struct file* filp, int mode)
+{
+	struct globalfifo_dev* dev = filp->private_data;
+	return fasync_helper(fd,filp,mode,&dev->async_queue);
+}
 
 int globalfifo_open(struct inode* inode, struct file* filp)
 {
@@ -45,6 +52,7 @@ int globalfifo_open(struct inode* inode, struct file* filp)
 
 int globalfifo_release(struct inode* inode, struct file* filp)
 {
+	globalfifo_fasync(-1,filp,0);
 	return 0;
 }
 
@@ -63,6 +71,8 @@ static int globalfifo_ioctl(struct inode* inodep, struct file* filp, unsigned in
 	return 0;
 }
 */
+
+
 static loff_t globalfifo_llseek(struct file *filp, loff_t offset, int orig)
 {
 	loff_t ret;
@@ -155,6 +165,12 @@ static ssize_t globalfifo_write(struct file* filp, const char __user * buf, size
 		
 		wake_up_interruptible(&dev->r_wait);
 		
+		if (dev->async_queue)
+		{
+			printk(KERN_INFO"[Zhang Yong]Gen async signal\n");
+			kill_fasync(&dev->async_queue,SIGIO,POLL_IN);
+		}	
+		
 		ret = count;
 	}
 out:
@@ -235,6 +251,7 @@ static const struct file_operations globalfifo_fops = {
 	.write = globalfifo_write,
 	.open = globalfifo_open,
 	.release = globalfifo_release,
+	.fasync = globalfifo_fasync,
 	/*.ioctl = globalfifo_ioctl,*/
 };
 
