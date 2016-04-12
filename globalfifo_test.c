@@ -5,14 +5,25 @@
 #include <signal.h>
 #include <unistd.h>
 
+int fd = -1;
+
 void input_handler(int signum)
 {
+	char data[100];
+	int len;
 	printf("receive a signal from globalfifo, signalnum:%d\n",signum);
+	
+	if(fd != -1)
+	{
+		len = read(fd,&data,100);
+		data[len] = 0;
+		printf("Read data: %s\n",data);
+	}
 }
 
 void main()
 {
-	int fd, oflags;
+	int oflags;
 	fd = open("/dev/globalfifo",O_RDWR, S_IRUSR | S_IWUSR);
 	if (fd != -1)
 	{
