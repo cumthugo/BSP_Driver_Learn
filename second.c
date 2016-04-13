@@ -26,26 +26,28 @@ struct second_dev
 {
 	struct cdev cdev;
 	atomic_t counter;
-	struct timer_list s_timer;
+	struct delayed_work s_delaywork;
 };
 
 struct second_dev* second_devp;
 
-static void second_timer_handle(unsigned long arg)
+static void second_delay_work_handle(struct work_struct* work)
 {
-	mod_timer(&second_devp->s_timer,jiffies + HZ);
+	struct delayed_work* p_delay_work = (struct delayed_work*)work;
+	
+	schedule_delayed_work(p_delay_work,HZ);
+	
 	atomic_inc(&second_devp->counter);
 	
 	printk(KERN_NOTICE"current jiffies is %ld\n",jiffies);
+	
 }
 
 int second_open(struct inode* inode, struct file* filp)
 {
-	init_timer(&second_devp->s_timer);
-	second_devp->s_timer.function = &second_timer_handle;
-	second_devp->s_timer.expires = jiffies + HZ;
+	INIT_DELAYED_WORK(&second_devp->s_delaywork,second_delay_work_handle);
 	
-	add_timer(&second_devp->s_timer);
+	schedule_delayed_work(&second_devp->s_delaywork,HZ);
 	
 	atomic_set(&second_devp->counter,0);
 	
@@ -54,7 +56,7 @@ int second_open(struct inode* inode, struct file* filp)
 
 int second_release(struct inode* inode, struct file* filp)
 {
-	del_timer(&second_devp->s_timer);
+	cancel_delayed_work(&second_devp->s_delaywork);
 	return 0;
 }
 
