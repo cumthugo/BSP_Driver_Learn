@@ -1,4 +1,4 @@
-obj-m := globalfifo.o
+obj-m := second.o
 KERNELDIR := /lib/modules/$(shell uname -r)/build 
 PWD := $(shell pwd)
 
