@@ -32,10 +32,10 @@ struct second_dev
 
 struct second_dev* second_devp;
 
-void second_do_tasklet(unsigned long);
-DECLARE_TASKLET(second_tasklet,second_do_tasklet,0);
+struct work_struct second_wq;
+void second_do_work(unsigned long);
 
-void second_do_tasklet(unsigned long arg)
+void second_do_work(unsigned long arg)
 {
 	mod_timer(&second_devp->s_timer,jiffies + HZ);
 	atomic_inc(&second_devp->counter);
@@ -44,7 +44,7 @@ void second_do_tasklet(unsigned long arg)
 
 static void second_timer_handle(unsigned long arg)
 {
-	tasklet_schedule(&second_tasklet);
+	schedule_work(&second_wq);
 }
 
 int second_open(struct inode* inode, struct file* filp)
@@ -56,6 +56,8 @@ int second_open(struct inode* inode, struct file* filp)
 	add_timer(&second_devp->s_timer);
 	
 	atomic_set(&second_devp->counter,0);
+	
+	INIT_WORK(&second_wq,(void(*)(void*))second_do_work,NULL);
 	
 	return 0;
 }
