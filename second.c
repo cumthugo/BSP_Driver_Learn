@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -31,12 +32,19 @@ struct second_dev
 
 struct second_dev* second_devp;
 
-static void second_timer_handle(unsigned long arg)
+void second_do_tasklet(unsigned long);
+DECLARE_TASKLET(second_tasklet,second_do_tasklet,0);
+
+void second_do_tasklet(unsigned long arg)
 {
 	mod_timer(&second_devp->s_timer,jiffies + HZ);
 	atomic_inc(&second_devp->counter);
-	
 	printk(KERN_NOTICE"current jiffies is %ld\n",jiffies);
+}
+
+static void second_timer_handle(unsigned long arg)
+{
+	tasklet_schedule(&second_tasklet);
 }
 
 int second_open(struct inode* inode, struct file* filp)
