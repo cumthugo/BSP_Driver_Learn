@@ -15,6 +15,7 @@
 #include <linux/cdev.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -33,9 +34,9 @@ struct second_dev
 struct second_dev* second_devp;
 
 struct work_struct second_wq;
-void second_do_work(unsigned long);
+void second_do_work(struct work_struct* work);
 
-void second_do_work(unsigned long arg)
+void second_do_work(struct work_struct* work)
 {
 	mod_timer(&second_devp->s_timer,jiffies + HZ);
 	atomic_inc(&second_devp->counter);
@@ -57,7 +58,7 @@ int second_open(struct inode* inode, struct file* filp)
 	
 	atomic_set(&second_devp->counter,0);
 	
-	INIT_WORK(&second_wq,(void(*)(void*))second_do_work,NULL);
+	INIT_WORK(&second_wq,second_do_work);
 	
 	return 0;
 }
