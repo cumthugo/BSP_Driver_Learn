@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -37,6 +38,9 @@ struct globalfifo_dev
 
 struct globalfifo_dev* globalfifo_devp;
 
+
+
+
 int globalfifo_open(struct inode* inode, struct file* filp)
 {
 	filp->private_data = globalfifo_devp;
@@ -48,21 +52,6 @@ int globalfifo_release(struct inode* inode, struct file* filp)
 	return 0;
 }
 
-/*
-static int globalfifo_ioctl(struct inode* inodep, struct file* filp, unsigned int cmd, unsigned long arg)
-{
-	switch(cmd)
-	{
-		case MEM_CLEAR:
-			memset(dev->mem,0,GLOBALFIFO_SIZE);
-			printk(KERN_INFO"globalfifo is set to zero\n");
-			break;
-		default:
-			return -EINVAL;
-	}
-	return 0;
-}
-*/
 static loff_t globalfifo_llseek(struct file *filp, loff_t offset, int orig)
 {
 	loff_t ret;
@@ -251,9 +240,8 @@ void globalfifo_setup_cdev(struct globalfifo_dev* dev, int index)
 		printk(KERN_NOTICE"Error %d adding globalfifo",err);
 }
 
-int globalfifo_init(void)
+static int __devinit globalfifo_probe(struct platform_device* pdev)
 {
-	printk("[Zhang Yong] globalfifo_init start\n");
 	int result;
 	dev_t devno = MKDEV(globalfifo_major,0);
 	
@@ -290,11 +278,38 @@ fail_malloc:
 	return result;
 }
 
-void globalfifo_exit(void)
+static int __devexit globalfifo_remove(struct platform_device* pdev)
 {
 	cdev_del(&globalfifo_devp->cdev);
 	kfree(globalfifo_devp);
 	unregister_chrdev_region(MKDEV(globalfifo_major,0), 1);
+	return 0;
+}
+
+static struct platform_driver globalfifo_device_driver = {
+	.probe = globalfifo_probe,
+	.remove = globalfifo_remove,
+	.driver = {
+		.name = "globalfifo",
+		.owner = THIS_MODULE,
+	}
+};
+
+static struct platform_device globalfifo_device = {
+	.name = "globalfifo",
+	.id = -1,
+};
+
+int globalfifo_init(void)
+{
+	printk("[Zhang Yong] globalfifo_init start\n");
+	platform_device_register(&globalfifo_device);
+	return platform_driver_register(&globalfifo_device_driver);
+}
+
+void globalfifo_exit(void)
+{
+	platform_driver_unregister(&globalfifo_device_driver);
 }
 module_param(globalfifo_major,int,S_IRUGO);
 module_init(globalfifo_init);
