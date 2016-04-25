@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/slab.h>
+#include <linux/list.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -31,17 +32,26 @@ struct globalmem_dev
 	struct semaphore sem;
 };
 
+struct data_list
+{
+	struct list_head list;
+	int data;
+};
+
+struct list_head data_list_head;
 
 struct globalmem_dev* globalmem_devp;
 
 int globalmem_open(struct inode* inode, struct file* filp)
 {
 	filp->private_data = globalmem_devp;
+	
 	return 0;
 }
 
 int globalmem_release(struct inode* inode, struct file* filp)
 {
+	
 	return 0;
 }
 
@@ -106,7 +116,9 @@ static ssize_t globalmem_write(struct file* filp, const char __user * buf, size_
 {
 	unsigned long p = *ppos;
 	int ret = 0;
+	struct data_list* pdata_list;
 	struct globalmem_dev* dev = filp->private_data;
+	
 
 	if (p >= GLOBALMEM_SIZE)
 		return 0;
@@ -120,9 +132,15 @@ static ssize_t globalmem_write(struct file* filp, const char __user * buf, size_
 		ret = -EFAULT;
 	else
 	{
-		*ppos += count;
+		*ppos += count;		
 		ret = count;
-		printk(KERN_INFO"written %d byte(s) from %d\n",count, p);
+		pdata_list = kmalloc(sizeof(struct data_list),GFP_KERNEL);
+		if (pdata_list)
+		{
+			list_add_tail(&pdata_list->list,&data_list_head);
+			pdata_list->data = count;
+		}
+		printk(KERN_INFO"written %d byte(s) from %lu\n",count, p);
 	}
 	up(&dev->sem);
 	return ret;
@@ -134,6 +152,8 @@ static ssize_t globalmem_read(struct file* filp, char __user *buf, size_t count,
 {
 	unsigned long p = *ppos;
 	int ret = 0;
+	struct list_head* cursor;
+	struct data_list* pdata_list;
 
 	struct globalmem_dev* dev = filp->private_data;
 
@@ -151,7 +171,12 @@ static ssize_t globalmem_read(struct file* filp, char __user *buf, size_t count,
 	{
 		*ppos += count;
 		ret = count;
-		printk(KERN_INFO"read %d byte(s) from %d\n",count, p);
+		list_for_each(cursor,&data_list_head)
+		{
+			pdata_list = list_entry(cursor,struct data_list,list);
+			printk(KERN_INFO"count:%d\n",pdata_list->data);
+		}
+		printk(KERN_INFO"read %d byte(s) from %lu\n",count, p);
 	}
 	up(&dev->sem);
 	return ret;
@@ -184,10 +209,12 @@ void globalmem_setup_cdev(struct globalmem_dev* dev, int index)
 
 int globalmem_init(void)
 {
-	printk("[Zhang Yong] globalmem_init start\n");
+	
 	int result;
 	dev_t devno = MKDEV(globalmem_major,0);
+	printk("[Zhang Yong] globalmem_init start\n");
 	
+	INIT_LIST_HEAD(&data_list_head);
 	if (globalmem_major)
 	{
 		result = register_chrdev_region(devno,1,"globalmem");
@@ -222,6 +249,14 @@ fail_malloc:
 
 void globalmem_exit(void)
 {
+	struct list_head *cursor,*next;
+	struct data_list* pdata_list;
+	list_for_each_safe(cursor,next,&data_list_head)
+	{
+		pdata_list = list_entry(cursor,struct data_list,list);
+		list_del(cursor); /*Important: list_del should be called before kfree, otherwise cause kernel oops!*/
+		kfree(pdata_list);		
+	}
 	cdev_del(&globalmem_devp->cdev);
 	kfree(globalmem_devp);
 	unregister_chrdev_region(MKDEV(globalmem_major,0), 1);
